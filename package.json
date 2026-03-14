@@ -1,0 +1,62 @@
+{
+  "name": "vscode-markdown-viewer",
+  "displayName": "Markdown Viewer",
+  "description": "A markdown editor with preview, rich text editing, and source editing modes",
+  "version": "0.0.1",
+  "publisher": "boundless",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "markdownViewer.editor",
+        "displayName": "Markdown Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          },
+          {
+            "filenamePattern": "*.markdown"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "markdownViewer.toggleMode",
+        "title": "Toggle Markdown View Mode",
+        "category": "Markdown Viewer"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "markdownViewer.toggleMode",
+        "key": "ctrl+shift+m",
+        "mac": "cmd+shift+m"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "bun run build.ts",
+    "watch": "bun run build.ts --watch"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.0.0",
+    "@types/node": "^25.5.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "markdown-it": "^14.0.0",
+    "github-markdown-css": "^5.8.0",
+    "@milkdown/crepe": "^7.7.0",
+    "@milkdown/kit": "^7.7.0"
+  }
+}
