@@ -3,6 +3,8 @@ import { THEMES } from "../themes";
 
 export interface SettingsState {
   source_sync: boolean;
+  spell_check: boolean;
+  custom_css: string;
 }
 
 interface ToolbarConfig {
@@ -11,6 +13,9 @@ interface ToolbarConfig {
   on_export_html: () => void;
   on_export_pdf: () => void;
   on_settings_change: (settings: SettingsState) => void;
+  on_font_size_change: (delta: number) => void;
+  on_toggle_toc: () => void;
+  on_toggle_diff: () => void;
   initial_theme?: string;
   initial_settings?: SettingsState;
   file_path?: string;
@@ -30,10 +35,12 @@ export class Toolbar {
   private parent_element: HTMLElement;
   private settings_panel: HTMLElement | null = null;
   private settings: SettingsState;
+  private config: ToolbarConfig;
 
   constructor(parent: HTMLElement, config: ToolbarConfig) {
     this.parent_element = parent;
-    this.settings = config.initial_settings || { source_sync: false };
+    this.config = config;
+    this.settings = config.initial_settings || { source_sync: false, spell_check: false, custom_css: "" };
 
     this.container = document.createElement("div");
     this.container.className = "toolbar";
@@ -53,6 +60,38 @@ export class Toolbar {
     }
     this.container.appendChild(mode_group);
 
+    // Divider
+    this.add_divider();
+
+    // TOC toggle
+    const toc_btn = this.create_subtle_button("TOC", "Toggle table of contents");
+    toc_btn.addEventListener("click", config.on_toggle_toc);
+    this.container.appendChild(toc_btn);
+
+    // Diff toggle
+    const diff_btn = this.create_subtle_button("Diff", "Show changes since last git commit");
+    diff_btn.addEventListener("click", config.on_toggle_diff);
+    this.container.appendChild(diff_btn);
+
+    // Divider
+    this.add_divider();
+
+    // Font size controls
+    const font_group = document.createElement("div");
+    font_group.className = "toolbar-group";
+
+    const font_minus = this.create_subtle_button("A\u2212", "Decrease font size");
+    font_minus.style.fontSize = "11px";
+    font_minus.addEventListener("click", () => config.on_font_size_change(-1));
+    font_group.appendChild(font_minus);
+
+    const font_plus = this.create_subtle_button("A+", "Increase font size");
+    font_plus.style.fontSize = "13px";
+    font_plus.addEventListener("click", () => config.on_font_size_change(1));
+    font_group.appendChild(font_plus);
+
+    this.container.appendChild(font_group);
+
     // Spacer
     const spacer = document.createElement("div");
     spacer.className = "toolbar-spacer";
@@ -62,24 +101,18 @@ export class Toolbar {
     const export_group = document.createElement("div");
     export_group.className = "toolbar-group";
 
-    const html_btn = document.createElement("button");
-    html_btn.className = "toolbar-button toolbar-button-subtle";
-    html_btn.textContent = "Export HTML";
+    const html_btn = this.create_subtle_button("Export HTML");
     html_btn.addEventListener("click", config.on_export_html);
     export_group.appendChild(html_btn);
 
-    const pdf_btn = document.createElement("button");
-    pdf_btn.className = "toolbar-button toolbar-button-subtle";
-    pdf_btn.textContent = "Print / PDF";
+    const pdf_btn = this.create_subtle_button("Print / PDF");
     pdf_btn.addEventListener("click", config.on_export_pdf);
     export_group.appendChild(pdf_btn);
 
     this.container.appendChild(export_group);
 
     // Divider
-    const divider1 = document.createElement("div");
-    divider1.className = "toolbar-divider";
-    this.container.appendChild(divider1);
+    this.add_divider();
 
     // Theme selector
     const theme_wrapper = document.createElement("div");
@@ -108,24 +141,21 @@ export class Toolbar {
     this.container.appendChild(theme_wrapper);
 
     // Divider
-    const divider2 = document.createElement("div");
-    divider2.className = "toolbar-divider";
-    this.container.appendChild(divider2);
+    this.add_divider();
 
-    // Settings gear button
+    // Settings gear
     const gear_btn = document.createElement("button");
     gear_btn.className = "toolbar-button toolbar-gear";
     gear_btn.title = "Settings";
     gear_btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.05 3.05l1.4 1.4M11.55 11.55l1.4 1.4M3.05 12.95l1.4-1.4M11.55 4.45l1.4-1.4"/></svg>`;
     gear_btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      this.toggle_settings_panel(config);
+      this.toggle_settings_panel();
     });
     this.container.appendChild(gear_btn);
 
     parent.prepend(this.container);
 
-    // Close settings when clicking outside
     document.addEventListener("click", () => {
       if (this.settings_panel) {
         this.settings_panel.remove();
@@ -140,7 +170,21 @@ export class Toolbar {
     this.set_active("preview");
   }
 
-  private toggle_settings_panel(config: ToolbarConfig): void {
+  private create_subtle_button(text: string, title?: string): HTMLButtonElement {
+    const btn = document.createElement("button");
+    btn.className = "toolbar-button toolbar-button-subtle";
+    btn.textContent = text;
+    if (title) btn.title = title;
+    return btn;
+  }
+
+  private add_divider(): void {
+    const d = document.createElement("div");
+    d.className = "toolbar-divider";
+    this.container.appendChild(d);
+  }
+
+  private toggle_settings_panel(): void {
     if (this.settings_panel) {
       this.settings_panel.remove();
       this.settings_panel = null;
@@ -151,37 +195,73 @@ export class Toolbar {
     this.settings_panel.className = "settings-panel";
     this.settings_panel.addEventListener("click", (e) => e.stopPropagation());
 
-    // Source sync toggle
-    const sync_row = document.createElement("label");
-    sync_row.className = "settings-row";
+    this.add_settings_toggle("Claude Code integration", "Opens source editor alongside for selection sync", this.settings.source_sync, (v) => {
+      this.settings.source_sync = v;
+      this.config.on_settings_change({ ...this.settings });
+    });
+
+    this.add_settings_toggle("Spell check", "Enable browser spell check in editors", this.settings.spell_check, (v) => {
+      this.settings.spell_check = v;
+      this.config.on_settings_change({ ...this.settings });
+    });
+
+    // Custom CSS input
+    const css_row = document.createElement("div");
+    css_row.className = "settings-row settings-row-vertical";
+
+    const css_label = document.createElement("span");
+    css_label.className = "settings-label-text";
+    css_label.textContent = "Custom CSS path";
+    css_row.appendChild(css_label);
+
+    const css_desc = document.createElement("span");
+    css_desc.className = "settings-label-desc";
+    css_desc.textContent = "Absolute path to a .css file to apply on top of the theme";
+    css_row.appendChild(css_desc);
+
+    const css_input = document.createElement("input");
+    css_input.type = "text";
+    css_input.className = "settings-input";
+    css_input.placeholder = "/path/to/custom.css";
+    css_input.value = this.settings.custom_css || "";
+    css_input.addEventListener("change", () => {
+      this.settings.custom_css = css_input.value;
+      this.config.on_settings_change({ ...this.settings });
+    });
+    css_row.appendChild(css_input);
+
+    this.settings_panel.appendChild(css_row);
+    this.container.appendChild(this.settings_panel);
+  }
+
+  private add_settings_toggle(label: string, desc: string, checked: boolean, on_change: (v: boolean) => void): void {
+    if (!this.settings_panel) return;
+
+    const row = document.createElement("label");
+    row.className = "settings-row";
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.className = "settings-checkbox";
-    checkbox.checked = this.settings.source_sync;
-    checkbox.addEventListener("change", () => {
-      this.settings.source_sync = checkbox.checked;
-      config.on_settings_change({ ...this.settings });
-    });
-    sync_row.appendChild(checkbox);
+    checkbox.checked = checked;
+    checkbox.addEventListener("change", () => on_change(checkbox.checked));
+    row.appendChild(checkbox);
 
-    const label_wrap = document.createElement("div");
-    label_wrap.className = "settings-label-wrap";
+    const wrap = document.createElement("div");
+    wrap.className = "settings-label-wrap";
 
-    const label_text = document.createElement("span");
-    label_text.className = "settings-label-text";
-    label_text.textContent = "Claude Code integration";
-    label_wrap.appendChild(label_text);
+    const text = document.createElement("span");
+    text.className = "settings-label-text";
+    text.textContent = label;
+    wrap.appendChild(text);
 
-    const label_desc = document.createElement("span");
-    label_desc.className = "settings-label-desc";
-    label_desc.textContent = "Opens a source editor alongside for selection sync";
-    label_wrap.appendChild(label_desc);
+    const description = document.createElement("span");
+    description.className = "settings-label-desc";
+    description.textContent = desc;
+    wrap.appendChild(description);
 
-    sync_row.appendChild(label_wrap);
-    this.settings_panel.appendChild(sync_row);
-
-    this.container.appendChild(this.settings_panel);
+    row.appendChild(wrap);
+    this.settings_panel.appendChild(row);
   }
 
   private create_path_bar(parent: HTMLElement, file_path: string): void {

@@ -1,0 +1,14 @@
+ins.diff-added {
+  background-color: var(--vscode-diffEditor-insertedTextBackground, rgba(72, 191, 83, 0.2));
+  text-decoration: none;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+del.diff-removed {
+  background-color: var(--vscode-diffEditor-removedTextBackground, rgba(230, 75, 75, 0.2));
+  text-decoration: line-through;
+  border-radius: 2px;
+  padding: 0 1px;
+  opacity: 0.8;
+}

@@ -1,0 +1,74 @@
+.search-overlay {
+  position: fixed;
+  top: 8px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--toolbar-bg, var(--bg, #fff));
+  border: 1px solid var(--border, #ddd);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-size: 13px;
+  color: var(--text, #333);
+}
+
+.search-overlay.hidden {
+  display: none;
+}
+
+.search-overlay input {
+  width: 200px;
+  padding: 4px 8px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 4px;
+  background: var(--bg, #fff);
+  color: var(--text, #333);
+  font-size: 13px;
+  outline: none;
+}
+
+.search-overlay input:focus {
+  border-color: var(--link, #0366d6);
+}
+
+.search-overlay .search-count {
+  white-space: nowrap;
+  min-width: 60px;
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.search-overlay button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text, #333);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.search-overlay button:hover {
+  background: var(--border, #ddd);
+}
+
+mark.search-match {
+  background: rgba(255, 200, 0, 0.4);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0;
+}
+
+mark.search-match.search-current {
+  background: rgba(255, 140, 0, 0.7);
+  outline: 2px solid rgba(255, 140, 0, 0.9);
+}

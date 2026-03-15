@@ -32,7 +32,7 @@ html, body {
   line-height: 1.72;
   max-width: 720px;
   margin: 0 auto;
-  font-size: 15.5px;
+  font-size: var(--user-font-size, 15.5px);
   word-wrap: break-word;
 }
 

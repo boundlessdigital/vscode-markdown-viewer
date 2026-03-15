@@ -1,0 +1,54 @@
+.link-preview-popover {
+  position: absolute;
+  z-index: 200;
+  width: 480px;
+  max-height: 360px;
+  background-color: var(--bg, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.link-preview-header {
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+  color: var(--text-muted, #9ca3af);
+  background-color: var(--bg-secondary, #f7f7f8);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.link-preview-body {
+  padding: 16px;
+  overflow-y: auto;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+  max-height: 320px;
+}
+
+.link-preview-body h1 { font-size: 1.3em !important; margin-top: 0 !important; }
+.link-preview-body h2 { font-size: 1.15em !important; margin-top: 16px !important; }
+.link-preview-body h3 { font-size: 1.05em !important; margin-top: 12px !important; }
+.link-preview-body pre { font-size: 11px !important; }
+
+.link-preview-loading {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted, #9ca3af);
+  font-size: 12px;
+}
+
+/* Scrollbar inside popover */
+.link-preview-body::-webkit-scrollbar { width: 4px; }
+.link-preview-body::-webkit-scrollbar-track { background: transparent; }
+.link-preview-body::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar, rgba(0, 0, 0, 0.12));
+  border-radius: 2px;
+}

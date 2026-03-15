@@ -230,3 +230,25 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   line-height: 1.4;
 }
+
+.settings-row-vertical {
+  flex-direction: column;
+  gap: 4px;
+  cursor: default;
+}
+
+.settings-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 4px;
+  background-color: var(--bg, #ffffff);
+  color: var(--text, #374151);
+  font-size: 12px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  outline: none;
+}
+
+.settings-input:focus {
+  border-color: var(--link, #2563eb);
+}

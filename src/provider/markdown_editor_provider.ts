@@ -35,10 +35,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       () => {
         vscode.commands.executeCommand(
           "workbench.action.webview.postMessage",
-          {
-            type: "set_mode",
-            mode: "next",
-          }
+          { type: "set_mode", mode: "next" }
         );
       }
     );
@@ -66,7 +63,6 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     let debounce_timer: ReturnType<typeof setTimeout> | undefined;
     let source_editor: vscode.TextEditor | undefined;
 
-    // Listen for document changes and forward to webview
     const change_subscription = vscode.workspace.onDidChangeTextDocument(
       (e) => {
         if (e.document.uri.toString() !== document.uri.toString()) return;
@@ -74,22 +70,18 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           is_updating_from_webview = false;
           return;
         }
-
         if (debounce_timer) clearTimeout(debounce_timer);
         debounce_timer = setTimeout(() => {
-          webview.postMessage({
-            type: "update",
-            text: document.getText(),
-          });
+          webview.postMessage({ type: "update", text: document.getText() });
         }, MarkdownEditorProvider.DEBOUNCE_MS);
       }
     );
 
-    // Listen for messages from the webview
     const message_subscription = webview.onDidReceiveMessage(
       async (message) => {
         switch (message.type) {
-          case "ready":
+          case "ready": {
+            const comments = this.load_comments(document);
             webview.postMessage({
               type: "init",
               text: document.getText(),
@@ -97,13 +89,14 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
               theme: this.context.globalState.get<string>(STATE_KEY_THEME, "light"),
               file_path: document.uri.fsPath,
               source_sync: this.context.globalState.get<boolean>(STATE_KEY_SOURCE_SYNC, false),
+              comments,
             });
             break;
+          }
 
           case "update_document": {
             const new_text = message.markdown as string;
             if (new_text === document.getText()) return;
-
             is_updating_from_webview = true;
             const edit = new vscode.WorkspaceEdit();
             edit.replace(
@@ -118,6 +111,16 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
             break;
           }
 
+          case "insert_text": {
+            const text = message.text as string;
+            const current = document.getText();
+            is_updating_from_webview = true;
+            const edit = new vscode.WorkspaceEdit();
+            edit.insert(document.uri, document.positionAt(current.length), "\n" + text + "\n");
+            await vscode.workspace.applyEdit(edit);
+            break;
+          }
+
           case "persist_mode":
             await this.context.globalState.update(STATE_KEY_MODE, message.mode);
             break;
@@ -128,27 +131,16 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
           case "persist_settings":
             if (message.settings) {
-              await this.context.globalState.update(
-                STATE_KEY_SOURCE_SYNC,
-                message.settings.source_sync ?? false
-              );
+              await this.context.globalState.update(STATE_KEY_SOURCE_SYNC, message.settings.source_sync ?? false);
             }
             break;
 
           case "export":
-            await this.handle_export(
-              message.format as string,
-              message.content as string,
-              document
-            );
+            await this.handle_export(message.format as string, message.content as string, document);
             break;
 
           case "selection_changed":
-            this.sync_selection_to_source_editor(
-              document,
-              message.text as string,
-              source_editor
-            );
+            this.sync_selection_to_source_editor(document, message.text as string, source_editor);
             break;
 
           case "open_source_editor":
@@ -161,6 +153,26 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
               source_editor.selection = new vscode.Selection(pos, pos);
             }
             break;
+
+          case "get_git_diff":
+            await this.send_git_diff(document, webview);
+            break;
+
+          case "save_image":
+            await this.save_image(document, message.name as string, message.data_base64 as string, webview);
+            break;
+
+          case "save_comments":
+            this.persist_comments(document, message.comments);
+            break;
+
+          case "load_custom_css":
+            await this.load_custom_css(message.path as string, webview);
+            break;
+
+          case "read_linked_file":
+            await this.read_linked_file(document, message.href as string, webview);
+            break;
         }
       }
     );
@@ -172,18 +184,103 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     });
   }
 
+  private async send_git_diff(
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): Promise<void> {
+    try {
+      const file_path = document.uri.fsPath;
+      const { execSync } = require("child_process");
+      const dir = path.dirname(file_path);
+      const result = execSync(`git show HEAD:${path.relative(dir, file_path).replace(/\\/g, "/")}`, {
+        cwd: dir,
+        encoding: "utf-8",
+        timeout: 5000,
+      });
+      webview.postMessage({ type: "git_diff_result", text: result });
+    } catch {
+      webview.postMessage({ type: "git_diff_result", text: "" });
+    }
+  }
+
+  private async save_image(
+    document: vscode.TextDocument,
+    name: string,
+    data_base64: string,
+    webview: vscode.Webview
+  ): Promise<void> {
+    try {
+      const dir = path.dirname(document.uri.fsPath);
+      const images_dir = path.join(dir, "images");
+      if (!fs.existsSync(images_dir)) {
+        fs.mkdirSync(images_dir, { recursive: true });
+      }
+      const safe_name = name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const file_path = path.join(images_dir, safe_name);
+      const buffer = Buffer.from(data_base64, "base64");
+      fs.writeFileSync(file_path, buffer);
+      webview.postMessage({ type: "image_saved", path: `images/${safe_name}` });
+    } catch (e) {
+      vscode.window.showErrorMessage(`Failed to save image: ${e}`);
+    }
+  }
+
+  private load_comments(document: vscode.TextDocument): any[] {
+    try {
+      const comments_path = document.uri.fsPath + ".comments.json";
+      if (fs.existsSync(comments_path)) {
+        return JSON.parse(fs.readFileSync(comments_path, "utf-8"));
+      }
+    } catch { /* ignore */ }
+    return [];
+  }
+
+  private persist_comments(document: vscode.TextDocument, comments: any[]): void {
+    try {
+      const comments_path = document.uri.fsPath + ".comments.json";
+      if (comments.length === 0) {
+        if (fs.existsSync(comments_path)) fs.unlinkSync(comments_path);
+      } else {
+        fs.writeFileSync(comments_path, JSON.stringify(comments, null, 2), "utf-8");
+      }
+    } catch { /* ignore */ }
+  }
+
+  private async read_linked_file(
+    document: vscode.TextDocument,
+    href: string,
+    webview: vscode.Webview
+  ): Promise<void> {
+    try {
+      const dir = path.dirname(document.uri.fsPath);
+      const file_path = path.resolve(dir, href);
+      if (fs.existsSync(file_path)) {
+        const content = fs.readFileSync(file_path, "utf-8");
+        const file_name = path.basename(file_path);
+        webview.postMessage({ type: "link_preview_content", content, file_name });
+      }
+    } catch { /* ignore */ }
+  }
+
+  private async load_custom_css(css_path: string, webview: vscode.Webview): Promise<void> {
+    try {
+      if (fs.existsSync(css_path)) {
+        const css = fs.readFileSync(css_path, "utf-8");
+        webview.postMessage({ type: "custom_css_loaded", css });
+      }
+    } catch { /* ignore */ }
+  }
+
   private async open_source_editor(
     document: vscode.TextDocument,
     webview_panel: vscode.WebviewPanel
   ): Promise<vscode.TextEditor | undefined> {
     try {
-      // Open the same file in a native text editor beside the webview
       const editor = await vscode.window.showTextDocument(document, {
         viewColumn: vscode.ViewColumn.Beside,
         preserveFocus: true,
         preview: false,
       });
-      // Focus back on the webview so the user doesn't notice
       webview_panel.reveal(webview_panel.viewColumn, false);
       return editor;
     } catch {
@@ -215,8 +312,6 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     if (source_editor.document.uri.toString() !== document.uri.toString()) return;
 
     const source = document.getText();
-
-    // 1. Try exact match first
     const exact_idx = source.indexOf(selected_text);
     if (exact_idx !== -1) {
       const start = document.positionAt(exact_idx);
@@ -226,22 +321,17 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       return;
     }
 
-    // 2. Fuzzy: split selected text into lines, find matching source lines
     const sel_lines = selected_text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
     if (sel_lines.length === 0) return;
 
     const src_lines = source.split("\n");
     const first_sel = sel_lines[0];
-
-    // Find the best starting line by matching the first selected line
     let best_start = -1;
     let best_score = 0;
 
     for (let i = 0; i < src_lines.length; i++) {
       const stripped = this.strip_md(src_lines[i]);
       if (stripped.length === 0) continue;
-
-      // Check if this source line contains the first selected line (or vice versa)
       if (first_sel.includes(stripped) || stripped.includes(first_sel)) {
         const score = Math.min(stripped.length, first_sel.length);
         if (score > best_score) {
@@ -253,11 +343,9 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
     if (best_start === -1) return;
 
-    // Find the end by matching subsequent selected lines
     let best_end = best_start;
     if (sel_lines.length > 1) {
       const last_sel = sel_lines[sel_lines.length - 1];
-      // Search forward from best_start for the last selected line
       for (let i = best_start + 1; i < Math.min(best_start + sel_lines.length + 10, src_lines.length); i++) {
         const stripped = this.strip_md(src_lines[i]);
         if (stripped.length > 0 && (last_sel.includes(stripped) || stripped.includes(last_sel))) {
@@ -265,7 +353,6 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           break;
         }
       }
-      // If we didn't find the last line, just extend by the number of selected lines
       if (best_end === best_start) {
         best_end = Math.min(best_start + sel_lines.length - 1, src_lines.length - 1);
       }
@@ -282,8 +369,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     html_content: string,
     document: vscode.TextDocument
   ): Promise<void> {
-    const base_name =
-      document.uri.path.split("/").pop()?.replace(/\.md$/i, "") || "document";
+    const base_name = document.uri.path.split("/").pop()?.replace(/\.md$/i, "") || "document";
 
     if (format === "html") {
       const uri = await vscode.window.showSaveDialog({
@@ -291,41 +377,24 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         filters: { "HTML Files": ["html"] },
       });
       if (uri) {
-        await vscode.workspace.fs.writeFile(
-          uri,
-          Buffer.from(html_content, "utf-8")
-        );
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(html_content, "utf-8"));
         vscode.window.showInformationMessage(`Exported to ${uri.fsPath}`);
       }
     } else if (format === "pdf") {
       const tmp_path = path.join(os.tmpdir(), `${base_name}_print.html`);
       fs.writeFileSync(tmp_path, html_content, "utf-8");
       await vscode.env.openExternal(vscode.Uri.file(tmp_path));
-      vscode.window.showInformationMessage(
-        "Opened in browser. Use Cmd+P / Ctrl+P to print or save as PDF."
-      );
+      vscode.window.showInformationMessage("Opened in browser. Use Cmd+P / Ctrl+P to print or save as PDF.");
     }
   }
 
   private get_html(webview: vscode.Webview): string {
     const script_uri = webview.asWebviewUri(
-      vscode.Uri.joinPath(
-        this.context.extensionUri,
-        "out",
-        "webview",
-        "main.js"
-      )
+      vscode.Uri.joinPath(this.context.extensionUri, "out", "webview", "main.js")
     );
-
     const style_uri = webview.asWebviewUri(
-      vscode.Uri.joinPath(
-        this.context.extensionUri,
-        "out",
-        "webview",
-        "main.css"
-      )
+      vscode.Uri.joinPath(this.context.extensionUri, "out", "webview", "main.css")
     );
-
     const nonce = get_nonce();
 
     return `<!DOCTYPE html>
@@ -347,8 +416,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
 function get_nonce(): string {
   let text = "";
-  const possible =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   for (let i = 0; i < 32; i++) {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   }
