@@ -6,6 +6,7 @@ const md = new MarkdownIt({
   html: true,
   linkify: true,
   typographer: true,
+  breaks: true,
 });
 
 let pending_preview: { popover: HTMLElement; link: HTMLElement } | null = null;

@@ -7,6 +7,7 @@ const md = new MarkdownIt({
   html: true,
   linkify: true,
   typographer: true,
+  breaks: true,
 });
 
 function get_current_theme(): Theme {

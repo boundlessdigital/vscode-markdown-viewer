@@ -1,7 +1,7 @@
 import { diffWords } from "diff";
 import MarkdownIt from "markdown-it";
 
-const md = new MarkdownIt({ html: true });
+const md = new MarkdownIt({ html: true, breaks: true });
 
 export class DiffView {
   /**
