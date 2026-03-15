@@ -40,7 +40,27 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       }
     );
 
-    return vscode.Disposable.from(provider_registration, toggle_command);
+    // Auto-open .md files with our custom editor when they're opened in the default text editor
+    const auto_open = vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (!editor) return;
+      const doc = editor.document;
+      if (
+        (doc.fileName.endsWith(".md") || doc.fileName.endsWith(".markdown")) &&
+        doc.uri.scheme === "file"
+      ) {
+        vscode.commands.executeCommand(
+          "vscode.openWith",
+          doc.uri,
+          MarkdownEditorProvider.VIEW_TYPE
+        );
+      }
+    });
+
+    return vscode.Disposable.from(
+      provider_registration,
+      toggle_command,
+      auto_open
+    );
   }
 
   public async resolveCustomTextEditor(

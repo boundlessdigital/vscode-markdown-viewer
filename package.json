@@ -11,7 +11,7 @@
     "Other"
   ],
   "main": "./out/extension.js",
-  "activationEvents": [],
+  "activationEvents": ["onStartupFinished"],
   "contributes": {
     "customEditors": [
       {
@@ -45,7 +45,10 @@
   },
   "scripts": {
     "build": "bun run build.ts",
-    "watch": "bun run build.ts --watch"
+    "watch": "bun run build.ts --watch",
+    "package": "bun run build.ts && npx @vscode/vsce package --allow-missing-repository",
+    "install-ext": "bun run package && find ~/.vscode/extensions -maxdepth 1 -name 'boundless.vscode-markdown-viewer-*' -type d -exec rm -r {} + 2>/dev/null; code --install-extension vscode-markdown-viewer-*.vsix",
+    "test": "bun test --preload ./happydom.ts --preload ./tests/preload_vscode.ts"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.8.4",
