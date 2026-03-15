@@ -48,10 +48,12 @@
     "watch": "bun run build.ts --watch"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^20.8.4",
     "@types/markdown-it": "^14.0.0",
     "@types/node": "^25.5.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.7.1",
+    "happy-dom": "^20.8.4",
     "typescript": "^5.7.0"
   },
   "dependencies": {
