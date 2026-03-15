@@ -1,10 +1,12 @@
 import type { EditorModeType } from "../types";
 import { THEMES } from "../themes";
+import type { BookmarkManager } from "../reading/bookmarks";
 
 export interface SettingsState {
   source_sync: boolean;
   spell_check: boolean;
   custom_css: string;
+  night_shift?: boolean;
 }
 
 interface ToolbarConfig {
@@ -16,6 +18,12 @@ interface ToolbarConfig {
   on_font_size_change: (delta: number) => void;
   on_toggle_toc: () => void;
   on_toggle_diff: () => void;
+  on_toggle_minimap: () => void;
+  on_toggle_split: () => void;
+  on_toggle_bookmarks: () => void;
+  on_nav_back: () => void;
+  on_nav_forward: () => void;
+  on_add_bookmark: () => void;
   initial_theme?: string;
   initial_settings?: SettingsState;
   file_path?: string;
@@ -34,13 +42,15 @@ export class Toolbar {
   private path_bar: HTMLElement | null = null;
   private parent_element: HTMLElement;
   private settings_panel: HTMLElement | null = null;
+  private bookmarks_panel: HTMLElement | null = null;
   private settings: SettingsState;
   private config: ToolbarConfig;
+  private reading_time_el: HTMLSpanElement | null = null;
 
   constructor(parent: HTMLElement, config: ToolbarConfig) {
     this.parent_element = parent;
     this.config = config;
-    this.settings = config.initial_settings || { source_sync: false, spell_check: false, custom_css: "" };
+    this.settings = config.initial_settings || { source_sync: false, spell_check: false, custom_css: "", night_shift: false };
 
     this.container = document.createElement("div");
     this.container.className = "toolbar";
@@ -48,7 +58,6 @@ export class Toolbar {
     // Mode buttons
     const mode_group = document.createElement("div");
     mode_group.className = "toolbar-group";
-
     for (const { mode, label } of MODE_BUTTONS) {
       const button = document.createElement("button");
       button.className = "toolbar-button";
@@ -60,23 +69,68 @@ export class Toolbar {
     }
     this.container.appendChild(mode_group);
 
-    // Divider
     this.add_divider();
 
-    // TOC toggle
+    // Reading tools group
+    const reading_group = document.createElement("div");
+    reading_group.className = "toolbar-group";
+
     const toc_btn = this.create_subtle_button("TOC", "Toggle table of contents");
     toc_btn.addEventListener("click", config.on_toggle_toc);
-    this.container.appendChild(toc_btn);
+    reading_group.appendChild(toc_btn);
 
-    // Diff toggle
-    const diff_btn = this.create_subtle_button("Diff", "Show changes since last git commit");
+    const diff_btn = this.create_subtle_button("Diff", "Show git changes");
     diff_btn.addEventListener("click", config.on_toggle_diff);
-    this.container.appendChild(diff_btn);
+    reading_group.appendChild(diff_btn);
 
-    // Divider
+    const minimap_btn = this.create_subtle_button("Map", "Toggle minimap");
+    minimap_btn.addEventListener("click", config.on_toggle_minimap);
+    reading_group.appendChild(minimap_btn);
+
+    const split_btn = this.create_subtle_button("Split", "Split view");
+    split_btn.addEventListener("click", config.on_toggle_split);
+    reading_group.appendChild(split_btn);
+
+    this.container.appendChild(reading_group);
+
     this.add_divider();
 
-    // Font size controls
+    // Nav + bookmark group
+    const nav_group = document.createElement("div");
+    nav_group.className = "toolbar-group nav-buttons";
+
+    const back_btn = document.createElement("button");
+    back_btn.className = "nav-btn";
+    back_btn.innerHTML = "&#8592;";
+    back_btn.title = "Back";
+    back_btn.addEventListener("click", config.on_nav_back);
+    nav_group.appendChild(back_btn);
+
+    const fwd_btn = document.createElement("button");
+    fwd_btn.className = "nav-btn";
+    fwd_btn.innerHTML = "&#8594;";
+    fwd_btn.title = "Forward";
+    fwd_btn.addEventListener("click", config.on_nav_forward);
+    nav_group.appendChild(fwd_btn);
+
+    const bmark_add = this.create_subtle_button("+\u2691", "Add bookmark");
+    bmark_add.style.fontSize = "13px";
+    bmark_add.addEventListener("click", config.on_add_bookmark);
+    nav_group.appendChild(bmark_add);
+
+    const bmark_list = this.create_subtle_button("\u2691", "Bookmarks");
+    bmark_list.style.fontSize = "13px";
+    bmark_list.addEventListener("click", (e) => {
+      e.stopPropagation();
+      config.on_toggle_bookmarks();
+    });
+    nav_group.appendChild(bmark_list);
+
+    this.container.appendChild(nav_group);
+
+    this.add_divider();
+
+    // Font size
     const font_group = document.createElement("div");
     font_group.className = "toolbar-group";
 
@@ -97,7 +151,7 @@ export class Toolbar {
     spacer.className = "toolbar-spacer";
     this.container.appendChild(spacer);
 
-    // Export buttons
+    // Export
     const export_group = document.createElement("div");
     export_group.className = "toolbar-group";
 
@@ -111,10 +165,9 @@ export class Toolbar {
 
     this.container.appendChild(export_group);
 
-    // Divider
     this.add_divider();
 
-    // Theme selector
+    // Theme
     const theme_wrapper = document.createElement("div");
     theme_wrapper.className = "toolbar-group theme-group";
 
@@ -131,19 +184,14 @@ export class Toolbar {
       option.textContent = theme.label;
       this.theme_select.appendChild(option);
     }
-    if (config.initial_theme) {
-      this.theme_select.value = config.initial_theme;
-    }
-    this.theme_select.addEventListener("change", () => {
-      config.on_theme_change(this.theme_select.value);
-    });
+    if (config.initial_theme) this.theme_select.value = config.initial_theme;
+    this.theme_select.addEventListener("change", () => config.on_theme_change(this.theme_select.value));
     theme_wrapper.appendChild(this.theme_select);
     this.container.appendChild(theme_wrapper);
 
-    // Divider
     this.add_divider();
 
-    // Settings gear
+    // Gear
     const gear_btn = document.createElement("button");
     gear_btn.className = "toolbar-button toolbar-gear";
     gear_btn.title = "Settings";
@@ -157,16 +205,11 @@ export class Toolbar {
     parent.prepend(this.container);
 
     document.addEventListener("click", () => {
-      if (this.settings_panel) {
-        this.settings_panel.remove();
-        this.settings_panel = null;
-      }
+      if (this.settings_panel) { this.settings_panel.remove(); this.settings_panel = null; }
+      if (this.bookmarks_panel) { this.bookmarks_panel.remove(); this.bookmarks_panel = null; }
     });
 
-    if (config.file_path) {
-      this.create_path_bar(parent, config.file_path);
-    }
-
+    if (config.file_path) this.create_path_bar(parent, config.file_path);
     this.set_active("preview");
   }
 
@@ -184,41 +227,50 @@ export class Toolbar {
     this.container.appendChild(d);
   }
 
-  private toggle_settings_panel(): void {
-    if (this.settings_panel) {
-      this.settings_panel.remove();
-      this.settings_panel = null;
+  toggle_bookmarks_dropdown(bm: BookmarkManager): void {
+    if (this.bookmarks_panel) {
+      this.bookmarks_panel.remove();
+      this.bookmarks_panel = null;
       return;
     }
+    this.bookmarks_panel = document.createElement("div");
+    this.bookmarks_panel.className = "bookmarks-dropdown";
+    this.bookmarks_panel.addEventListener("click", (e) => e.stopPropagation());
+    bm.render_list(this.bookmarks_panel);
+    this.container.appendChild(this.bookmarks_panel);
+  }
+
+  private toggle_settings_panel(): void {
+    if (this.settings_panel) { this.settings_panel.remove(); this.settings_panel = null; return; }
 
     this.settings_panel = document.createElement("div");
     this.settings_panel.className = "settings-panel";
     this.settings_panel.addEventListener("click", (e) => e.stopPropagation());
 
-    this.add_settings_toggle("Claude Code integration", "Opens source editor alongside for selection sync", this.settings.source_sync, (v) => {
+    this.add_settings_toggle("Claude Code integration", "Opens source editor for selection sync", this.settings.source_sync, (v) => {
       this.settings.source_sync = v;
       this.config.on_settings_change({ ...this.settings });
     });
-
-    this.add_settings_toggle("Spell check", "Enable browser spell check in editors", this.settings.spell_check, (v) => {
+    this.add_settings_toggle("Spell check", "Enable browser spell check", this.settings.spell_check, (v) => {
       this.settings.spell_check = v;
       this.config.on_settings_change({ ...this.settings });
     });
+    this.add_settings_toggle("Night shift", "Auto-switch to dark theme at night (8pm\u20137am)", this.settings.night_shift ?? false, (v) => {
+      this.settings.night_shift = v;
+      this.config.on_settings_change({ ...this.settings });
+    });
 
-    // Custom CSS input
+    // Custom CSS
     const css_row = document.createElement("div");
     css_row.className = "settings-row settings-row-vertical";
-
     const css_label = document.createElement("span");
     css_label.className = "settings-label-text";
     css_label.textContent = "Custom CSS path";
     css_row.appendChild(css_label);
-
     const css_desc = document.createElement("span");
     css_desc.className = "settings-label-desc";
-    css_desc.textContent = "Absolute path to a .css file to apply on top of the theme";
+    css_desc.textContent = "Absolute path to a .css file to overlay";
     css_row.appendChild(css_desc);
-
     const css_input = document.createElement("input");
     css_input.type = "text";
     css_input.className = "settings-input";
@@ -229,37 +281,31 @@ export class Toolbar {
       this.config.on_settings_change({ ...this.settings });
     });
     css_row.appendChild(css_input);
-
     this.settings_panel.appendChild(css_row);
+
     this.container.appendChild(this.settings_panel);
   }
 
   private add_settings_toggle(label: string, desc: string, checked: boolean, on_change: (v: boolean) => void): void {
     if (!this.settings_panel) return;
-
     const row = document.createElement("label");
     row.className = "settings-row";
-
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.className = "settings-checkbox";
     checkbox.checked = checked;
     checkbox.addEventListener("change", () => on_change(checkbox.checked));
     row.appendChild(checkbox);
-
     const wrap = document.createElement("div");
     wrap.className = "settings-label-wrap";
-
     const text = document.createElement("span");
     text.className = "settings-label-text";
     text.textContent = label;
     wrap.appendChild(text);
-
     const description = document.createElement("span");
     description.className = "settings-label-desc";
     description.textContent = desc;
     wrap.appendChild(description);
-
     row.appendChild(wrap);
     this.settings_panel.appendChild(row);
   }
@@ -276,7 +322,7 @@ export class Toolbar {
 
     const copy_btn = document.createElement("button");
     copy_btn.className = "path-copy-btn";
-    copy_btn.title = "Copy path to clipboard";
+    copy_btn.title = "Copy path";
     copy_btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5 2H13V12H5V2Z" stroke="currentColor" stroke-width="1.2"/><path d="M3 4V14H11" stroke="currentColor" stroke-width="1.2"/></svg>`;
     copy_btn.addEventListener("click", () => {
       navigator.clipboard.writeText(file_path).then(() => {
@@ -289,6 +335,12 @@ export class Toolbar {
       });
     });
     this.path_bar.appendChild(copy_btn);
+
+    // Reading time goes in path bar
+    this.reading_time_el = document.createElement("span");
+    this.reading_time_el.className = "reading-time";
+    this.path_bar.appendChild(this.reading_time_el);
+
     parent.appendChild(this.path_bar);
   }
 
@@ -297,11 +349,12 @@ export class Toolbar {
       this.create_path_bar(this.parent_element, file_path);
     } else {
       const text = this.path_bar.querySelector(".path-text");
-      if (text) {
-        text.textContent = file_path;
-        (text as HTMLElement).title = file_path;
-      }
+      if (text) { text.textContent = file_path; (text as HTMLElement).title = file_path; }
     }
+  }
+
+  set_reading_time(time_str: string): void {
+    if (this.reading_time_el) this.reading_time_el.textContent = time_str;
   }
 
   set_active(mode: EditorModeType): void {
@@ -315,11 +368,6 @@ export class Toolbar {
     this.theme_select.value = theme_id;
   }
 
-  get_settings(): SettingsState {
-    return this.settings;
-  }
-
-  get_current_mode(): EditorModeType {
-    return this.current_mode;
-  }
+  get_settings(): SettingsState { return this.settings; }
+  get_current_mode(): EditorModeType { return this.current_mode; }
 }

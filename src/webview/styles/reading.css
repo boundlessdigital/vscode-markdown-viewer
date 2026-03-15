@@ -1,0 +1,272 @@
+/* ─── Progress Bar ─── */
+.progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background-color: var(--link, #2563eb);
+  opacity: 0.6;
+  z-index: 300;
+  transition: width 0.1s ease-out;
+  pointer-events: none;
+}
+
+/* ─── Breadcrumbs ─── */
+.breadcrumbs-bar {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  height: 28px;
+  background-color: var(--bg-secondary, #f7f7f8);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  font-size: 11px;
+  color: var(--text-muted, #9ca3af);
+  overflow: hidden;
+  white-space: nowrap;
+  transition: background-color 0.25s ease;
+}
+
+.breadcrumb-item {
+  cursor: pointer;
+  color: var(--text-muted, #9ca3af);
+  transition: color 0.1s ease;
+}
+
+.breadcrumb-item:hover {
+  color: var(--text, #374151);
+}
+
+.breadcrumb-item:last-child {
+  color: var(--text-secondary, #6b7280);
+}
+
+.breadcrumb-separator {
+  margin: 0 6px;
+  color: var(--text-muted, #9ca3af);
+  font-size: 9px;
+}
+
+/* ─── Minimap ─── */
+.minimap {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 90px;
+  height: 100%;
+  background-color: var(--bg-secondary, #f7f7f8);
+  border-left: 1px solid var(--border, #e5e7eb);
+  overflow: hidden;
+  z-index: 50;
+  cursor: pointer;
+  transition: background-color 0.25s ease;
+}
+
+.minimap-content {
+  transform-origin: top left;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.minimap-viewport {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background-color: var(--link, #2563eb);
+  opacity: 0.08;
+  border: 1px solid var(--link, #2563eb);
+  border-left: none;
+  border-right: none;
+  pointer-events: none;
+  transition: top 0.1s ease-out;
+}
+
+/* ─── Collapsible Sections ─── */
+.collapsible-heading {
+  cursor: pointer;
+  user-select: text;
+}
+
+.collapsible-heading:hover .collapse-chevron {
+  opacity: 1;
+}
+
+.collapse-chevron {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+  opacity: 0.3;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  vertical-align: middle;
+}
+
+.collapsible-heading.collapsed .collapse-chevron {
+  transform: rotate(-90deg);
+}
+
+.collapsible-content {
+  overflow: hidden;
+  transition: max-height 0.2s ease;
+}
+
+.collapsible-content.collapsed {
+  display: none;
+}
+
+/* ─── Split View ─── */
+#editor-container.split-active {
+  display: flex;
+}
+
+.split-pane {
+  flex: 1;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.split-divider {
+  width: 1px;
+  background-color: var(--border, #e5e7eb);
+  flex-shrink: 0;
+}
+
+.split-pane-right {
+  padding: 48px 48px 80px;
+}
+
+.split-pane-right .markdown-body {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ─── Annotations ─── */
+.annotation-toolbar {
+  position: fixed;
+  z-index: 250;
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px;
+  background-color: var(--bg, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.annotation-color-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.1s ease, transform 0.1s ease;
+}
+
+.annotation-color-btn:hover {
+  transform: scale(1.15);
+  border-color: var(--text-muted, #9ca3af);
+}
+
+mark.annotation {
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* ─── Bookmarks ─── */
+.bookmarks-dropdown {
+  position: absolute;
+  top: 42px;
+  right: 40px;
+  background-color: var(--bg, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+  z-index: 200;
+  min-width: 220px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.bookmark-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  transition: background-color 0.1s ease;
+}
+
+.bookmark-item:hover {
+  background-color: var(--bg-secondary, #f7f7f8);
+  color: var(--text, #374151);
+}
+
+.bookmark-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmark-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted, #9ca3af);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.bookmark-remove:hover {
+  color: var(--text, #374151);
+}
+
+.bookmarks-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+}
+
+/* ─── Reading Time ─── */
+.reading-time {
+  font-size: 11px;
+  color: var(--text-muted, #9ca3af);
+  margin-left: auto;
+  padding-left: 12px;
+  white-space: nowrap;
+}
+
+/* ─── Nav History Buttons ─── */
+.nav-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.nav-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted, #9ca3af);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 3px;
+  transition: color 0.1s ease, background-color 0.1s ease;
+}
+
+.nav-btn:hover:not(:disabled) {
+  color: var(--text, #374151);
+  background-color: var(--bg-tertiary, #ebebed);
+}
+
+.nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}

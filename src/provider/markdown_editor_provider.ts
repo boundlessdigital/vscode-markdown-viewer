@@ -90,6 +90,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
               file_path: document.uri.fsPath,
               source_sync: this.context.globalState.get<boolean>(STATE_KEY_SOURCE_SYNC, false),
               comments,
+              annotations: this.load_json_file(document, ".annotations.json"),
             });
             break;
           }
@@ -170,6 +171,17 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
             await this.load_custom_css(message.path as string, webview);
             break;
 
+          case "save_annotations":
+            this.save_json_file(document, ".annotations.json", message.annotations);
+            break;
+
+          case "save_bookmarks":
+            await this.context.globalState.update(
+              `bookmarks:${document.uri.fsPath}`,
+              message.bookmarks
+            );
+            break;
+
           case "read_linked_file":
             await this.read_linked_file(document, message.href as string, webview);
             break;
@@ -223,6 +235,25 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to save image: ${e}`);
     }
+  }
+
+  private load_json_file(document: vscode.TextDocument, suffix: string): any[] {
+    try {
+      const p = document.uri.fsPath + suffix;
+      if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, "utf-8"));
+    } catch { /* ignore */ }
+    return [];
+  }
+
+  private save_json_file(document: vscode.TextDocument, suffix: string, data: any[]): void {
+    try {
+      const p = document.uri.fsPath + suffix;
+      if (!data || data.length === 0) {
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      } else {
+        fs.writeFileSync(p, JSON.stringify(data, null, 2), "utf-8");
+      }
+    } catch { /* ignore */ }
   }
 
   private load_comments(document: vscode.TextDocument): any[] {

@@ -2,7 +2,7 @@
   "name": "vscode-markdown-viewer",
   "displayName": "Markdown Viewer",
   "description": "A polished, themeable Markdown viewer and WYSIWYG editor with syntax highlighting, Mermaid diagrams, KaTeX math, TOC, search, diff view, comments, and more",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "boundless",
   "engines": {
     "vscode": "^1.85.0"

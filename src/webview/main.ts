@@ -8,6 +8,16 @@ import { SearchOverlay } from "./search/search";
 import { ImageHandler } from "./images/image_handler";
 import { CommentsManager } from "./comments/comments";
 import { LinkPreview } from "./link-preview/link_preview";
+import { ProgressBar } from "./reading/progress_bar";
+import { Breadcrumbs } from "./reading/breadcrumbs";
+import { NavHistory } from "./reading/nav_history";
+import { Minimap } from "./reading/minimap";
+import { CollapsibleSections } from "./reading/collapsible";
+import { SplitView } from "./reading/split_view";
+import { AnnotationManager } from "./reading/annotations";
+import { BookmarkManager } from "./reading/bookmarks";
+import { NightShift } from "./reading/night_shift";
+import { calculate_reading_time } from "./reading/reading_time";
 import { apply_theme } from "./themes";
 import { export_html, export_pdf } from "./export";
 import { post_message } from "./util/vscode_api";
@@ -19,6 +29,7 @@ import "./styles/images.css";
 import "./styles/diff.css";
 import "./styles/comments.css";
 import "./styles/link-preview.css";
+import "./styles/reading.css";
 
 const modes: Record<EditorModeType, EditorMode> = {
   preview: new PreviewMode(),
@@ -37,6 +48,15 @@ let search: SearchOverlay | null = null;
 let image_handler: ImageHandler | null = null;
 let comments_manager: CommentsManager | null = null;
 let link_preview: LinkPreview | null = null;
+let progress_bar: ProgressBar | null = null;
+let breadcrumbs: Breadcrumbs | null = null;
+let nav_history: NavHistory | null = null;
+let minimap: Minimap | null = null;
+let collapsible: CollapsibleSections | null = null;
+let split_view: SplitView | null = null;
+let annotation_manager: AnnotationManager | null = null;
+let bookmark_manager: BookmarkManager | null = null;
+let night_shift: NightShift | null = null;
 let is_initialized = false;
 let source_sync_enabled = false;
 let diff_enabled = false;
@@ -77,17 +97,23 @@ function handle_settings_change(settings: SettingsState) {
     post_message("open_source_editor");
   }
 
-  // Spell check
   const container = document.getElementById("editor-container");
   if (container) {
     container.setAttribute("spellcheck", settings.spell_check ? "true" : "false");
   }
 
-  // Custom CSS
   if (settings.custom_css) {
     post_message("load_custom_css", { path: settings.custom_css });
   } else if (custom_css_el) {
     custom_css_el.textContent = "";
+  }
+
+  // Night shift
+  if (night_shift) {
+    night_shift.configure(
+      { enabled: settings.night_shift ?? false, start_hour: 20, end_hour: 7 },
+      current_theme
+    );
   }
 }
 
@@ -101,7 +127,6 @@ function toggle_toc() {
     toc = new TableOfContents(editor_container);
   }
   toc.toggle();
-  // Update TOC with current headings
   const body = editor_container.querySelector(".markdown-body");
   if (body && toc.is_visible()) {
     toc.update(body as HTMLElement);
@@ -114,34 +139,102 @@ function toggle_diff() {
     post_message("get_git_diff");
   } else {
     diff_base = "";
-    // Re-render without diff
     if (is_initialized) {
       modes[current_mode].update_content(current_markdown);
-      update_toc();
+      after_render();
     }
   }
+}
+
+function toggle_minimap() {
+  if (!minimap) {
+    minimap = new Minimap(editor_container);
+  }
+  minimap.toggle();
+  if (minimap.is_visible()) {
+    minimap.update();
+  }
+}
+
+function toggle_split() {
+  if (!split_view) {
+    split_view = new SplitView(editor_container);
+  }
+  split_view.toggle();
+}
+
+function toggle_bookmarks() {
+  toolbar.toggle_bookmarks_dropdown(bookmark_manager!);
+}
+
+function nav_back() {
+  if (nav_history) nav_history.back();
+}
+
+function nav_forward() {
+  if (nav_history) nav_history.forward();
+}
+
+function after_render() {
+  setTimeout(() => {
+    update_toc();
+    update_comments();
+    update_breadcrumbs();
+    apply_collapsible();
+    apply_annotations();
+    update_reading_time();
+    if (minimap?.is_visible()) minimap.update();
+  }, 50);
 }
 
 function update_toc() {
   if (toc && toc.is_visible()) {
     const body = editor_container.querySelector(".markdown-body");
-    if (body) {
-      toc.update(body as HTMLElement);
-    }
+    if (body) toc.update(body as HTMLElement);
   }
 }
 
 function update_comments() {
   if (comments_manager && current_mode === "preview") {
     const body = editor_container.querySelector(".markdown-body");
-    if (body) {
-      comments_manager.attach_to_headings(body as HTMLElement);
-    }
+    if (body) comments_manager.attach_to_headings(body as HTMLElement);
   }
+}
+
+function update_breadcrumbs() {
+  if (breadcrumbs) {
+    const body = editor_container.querySelector(".markdown-body");
+    if (body) breadcrumbs.update(body as HTMLElement);
+  }
+}
+
+function apply_collapsible() {
+  if (collapsible) {
+    const body = editor_container.querySelector(".markdown-body");
+    if (body) collapsible.apply(body as HTMLElement);
+  }
+}
+
+function apply_annotations() {
+  if (annotation_manager) {
+    const body = editor_container.querySelector(".markdown-body");
+    if (body) annotation_manager.apply(body as HTMLElement);
+  }
+}
+
+function update_reading_time() {
+  const time_str = calculate_reading_time(current_markdown);
+  toolbar.set_reading_time(time_str);
 }
 
 function init() {
   editor_container = document.getElementById("editor-container")!;
+
+  night_shift = new NightShift((theme_id) => {
+    current_theme = theme_id;
+    apply_theme(theme_id);
+    toolbar.set_theme(theme_id);
+  });
 
   toolbar = new Toolbar(document.body, {
     on_mode_change: switch_mode,
@@ -152,6 +245,12 @@ function init() {
     on_font_size_change: change_font_size,
     on_toggle_toc: toggle_toc,
     on_toggle_diff: toggle_diff,
+    on_toggle_minimap: toggle_minimap,
+    on_toggle_split: toggle_split,
+    on_toggle_bookmarks: toggle_bookmarks,
+    on_nav_back: nav_back,
+    on_nav_forward: nav_forward,
+    on_add_bookmark: () => bookmark_manager?.add_bookmark(),
     initial_theme: current_theme,
   });
 
@@ -159,6 +258,12 @@ function init() {
   image_handler = new ImageHandler(editor_container);
   comments_manager = new CommentsManager(editor_container);
   link_preview = new LinkPreview(editor_container);
+  progress_bar = new ProgressBar(editor_container);
+  breadcrumbs = new Breadcrumbs(document.body, editor_container);
+  nav_history = new NavHistory(editor_container);
+  collapsible = new CollapsibleSections();
+  annotation_manager = new AnnotationManager(editor_container);
+  bookmark_manager = new BookmarkManager(editor_container);
 
   setup_selection_listener();
 
@@ -179,10 +284,12 @@ function init() {
         if (message.comments) {
           comments_manager?.load_comments(message.comments);
         }
+        if (message.annotations) {
+          annotation_manager?.load_annotations(message.annotations);
+        }
         is_initialized = true;
         modes[current_mode].activate(editor_container, current_markdown).then(() => {
-          update_toc();
-          update_comments();
+          after_render();
         });
         break;
 
@@ -190,10 +297,7 @@ function init() {
         if (is_initialized) {
           current_markdown = message.text;
           modes[current_mode].update_content(current_markdown);
-          setTimeout(() => {
-            update_toc();
-            update_comments();
-          }, 50);
+          after_render();
         }
         break;
 
@@ -211,9 +315,8 @@ function init() {
       case "git_diff_result":
         diff_base = message.text || "";
         if (diff_enabled && is_initialized) {
-          // Re-render with diff - DiffView will be used in preview_mode
           modes[current_mode].update_content(current_markdown);
-          update_toc();
+          after_render();
         }
         break;
 
@@ -255,8 +358,7 @@ async function switch_mode(new_mode: EditorModeType) {
   post_message("persist_mode", { mode: new_mode });
 
   await modes[new_mode].activate(editor_container, current_markdown);
-  update_toc();
-  update_comments();
+  after_render();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
