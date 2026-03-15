@@ -1,24 +1,32 @@
 # Markdown Viewer for VSCode
 
-A polished, themeable Markdown editor for Visual Studio Code that replaces the default text editor with a beautifully rendered preview — with optional rich text (WYSIWYG) editing, export capabilities, and Claude Code integration.
+A polished, themeable Markdown viewer and editor for Visual Studio Code. Replaces the default text editor with a beautifully rendered preview, with optional WYSIWYG editing and a rich set of features for reading, writing, and collaborating on Markdown documents.
 
 ## Features
 
-### Preview Mode
-Opens `.md` files in a clean, rendered preview by default. Typography is carefully designed with a grayscale heading hierarchy, proper spacing, and antialiased rendering.
+### Preview & Editing
 
-### Rich Text Editing
-Switch to Rich Edit mode for full WYSIWYG markdown editing powered by [Milkdown](https://milkdown.dev/) (ProseMirror-based). Includes a toolbar with support for:
-- Bold, italic, strikethrough
-- Headings, links, images
-- Ordered and unordered lists
-- Blockquotes, code blocks, tables
-- Slash commands and keyboard shortcuts
+- **Preview Mode** — Opens `.md` files in a clean, rendered preview by default. Typography uses a refined grayscale heading hierarchy with proper spacing.
+- **Rich Text Editing** — Switch to Rich Edit mode for full WYSIWYG editing powered by [Milkdown](https://milkdown.dev/) (ProseMirror-based). Bold, italic, headings, links, images, lists, blockquotes, code blocks, tables, slash commands. All edits save back as clean Markdown.
+- **Font Size Controls** — Quick A−/A+ buttons in the toolbar to adjust reading size.
 
-All edits are saved back as clean Markdown — no HTML conversion artifacts.
+### Rendering
 
-### Color Themes
+- **Syntax Highlighting** — Code blocks are highlighted using [highlight.js](https://highlightjs.org/) with language auto-detection.
+- **Mermaid Diagrams** — ` ```mermaid ` code blocks render as interactive SVG diagrams.
+- **KaTeX Math** — Inline `$...$` and display `$$...$$` math expressions render with [KaTeX](https://katex.org/).
+- **YAML Frontmatter** — Frontmatter blocks are stripped from the preview while preserved in the source.
+
+### Navigation & Search
+
+- **Table of Contents** — Click "TOC" in the toolbar to open a sidebar with all headings. Click to jump, current section highlights as you scroll.
+- **In-Preview Search** — `Cmd+F` / `Ctrl+F` opens a search overlay that finds and highlights matches in the rendered text, with match count and arrow navigation.
+- **Linked File Preview** — Hover over a link to another `.md` file to see a floating preview of its rendered content.
+
+### Themes
+
 Five built-in themes, switchable from the toolbar:
+
 - **Light** — Clean white with charcoal typography
 - **Dark** — Deep dark with subtle contrast
 - **Sepia** — Warm, book-like reading experience
@@ -27,33 +35,51 @@ Five built-in themes, switchable from the toolbar:
 
 Theme preference persists across files and VSCode windows.
 
+### Images
+
+- **Drag and Drop** — Drop an image file onto the preview. It saves to an `images/` folder in your project and inserts the Markdown reference.
+- **Paste from Clipboard** — Paste a screenshot and it auto-saves the same way.
+
+### Collaboration
+
+- **Comments / Annotations** — Click the speech bubble icon next to any heading to add notes. Comments are stored in a `.comments.json` file alongside the Markdown and don't pollute the source. Click away to dismiss.
+- **Git Diff View** — Click "Diff" in the toolbar to highlight what changed since the last git commit — green for additions, red for removals.
+
 ### Export
+
 - **Export HTML** — Saves a standalone `.html` file with all styles baked in. Looks identical to the preview.
-- **Print / PDF** — Opens the rendered document in your browser for printing or saving as PDF via `Cmd+P` / `Ctrl+P`.
+- **Print / PDF** — Opens the rendered document in your browser for printing or saving as PDF.
 
-### YAML Frontmatter
-Files with YAML frontmatter (common in static site generators, documentation systems, etc.) are handled gracefully — the frontmatter block is stripped from the preview while preserved in the underlying source.
+### Settings
 
-### File Path Bar
-A subtle status bar at the bottom shows the full file path with a one-click copy button.
+Click the gear icon in the toolbar to access:
 
-### Claude Code Integration (Optional)
-Enable via the gear icon in the toolbar. When turned on, the extension opens the same file in a native VSCode text editor alongside the preview. Text selections in the preview are mapped back to the source and highlighted in the native editor, allowing Claude Code (and other extensions) to detect the active file and selected text.
+- **Claude Code Integration** — Opens a native text editor alongside the preview. Selections in the preview are mapped back to source, allowing Claude Code to detect the active file and selected text.
+- **Spell Check** — Enables browser spell checking in the editor.
+- **Custom CSS** — Provide a path to a `.css` file to apply on top of any theme.
+
+### Other
+
+- **File Path Bar** — Subtle status bar at the bottom with the full file path and a one-click copy button.
+- **Persistent Preferences** — Theme, mode, font size, and settings persist across files and VSCode windows via global state.
 
 ## Installation
 
 ### From `.vsix` file
 
-1. Build the extension (see below)
-2. Package it:
-   ```bash
-   npx @vscode/vsce package
-   ```
-3. Install the generated `.vsix` file:
-   ```bash
-   code --install-extension vscode-markdown-viewer-0.0.1.vsix
-   ```
-   Or in VSCode: `Cmd+Shift+P` → "Extensions: Install from VSIX..." → select the file.
+```bash
+# Clone and build
+git clone https://github.com/boundlessdigital/vscode-markdown-viewer.git
+cd vscode-markdown-viewer
+bun install
+bun run build
+npx @vscode/vsce package --allow-missing-repository
+
+# Install
+code --install-extension vscode-markdown-viewer-0.1.0.vsix
+```
+
+Or in VSCode: `Cmd+Shift+P` → "Extensions: Install from VSIX..." → select the file.
 
 ### From source (development)
 
@@ -64,49 +90,32 @@ bun install
 bun run build
 ```
 
-Then open the project in VSCode and press `F5` (or `Cmd+Shift+P` → "Debug: Select and Start Debugging" → "Run Extension") to launch the Extension Development Host.
-
-## Building
-
-The extension uses [Bun](https://bun.sh/) for package management and building.
-
-```bash
-# Install dependencies
-bun install
-
-# Build the extension (compiles TypeScript, bundles webview)
-bun run build
-
-# Package as .vsix for distribution
-npx @vscode/vsce package
-```
-
-The build script (`build.ts`) produces two bundles:
-- `out/extension.js` — Extension host code (Node.js target, CJS)
-- `out/webview/main.js` + `out/webview/main.css` — Webview code (browser target)
-
-## Architecture
-
-The extension uses VSCode's `CustomTextEditorProvider` API with two runtime environments:
-
-- **Extension Host** (Node.js): Manages the `TextDocument`, handles file I/O, bidirectional sync with the webview, export functionality, and Claude Code integration.
-- **Webview** (Browser): Renders the UI with three modes — Preview (markdown-it), Rich Edit (Milkdown Crepe), and an internal Source mode. Handles theme application, toolbar, and selection detection.
-
-### Key Libraries
-- [markdown-it](https://github.com/markdown-it/markdown-it) — Markdown to HTML rendering
-- [Milkdown](https://milkdown.dev/) (via Crepe API) — WYSIWYG editor (ProseMirror + remark)
-- [Bun](https://bun.sh/) — Build tooling and package management
+Open the project in VSCode, then `Cmd+Shift+P` → "Debug: Select and Start Debugging" → "Run Extension".
 
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
 | `Cmd+Shift+M` / `Ctrl+Shift+M` | Cycle between viewing modes |
+| `Cmd+F` / `Ctrl+F` | Search within the preview |
 | `Cmd+S` / `Ctrl+S` | Save (works in all modes) |
 
-## Configuration
+## Architecture
 
-All preferences (theme, viewing mode, Claude Code integration) are persisted via VSCode's global state and apply across all files and windows. No manual configuration files needed.
+The extension uses VSCode's `CustomTextEditorProvider` API with two runtime environments:
+
+- **Extension Host** (Node.js) — Manages the `TextDocument`, file I/O, bidirectional sync, export, git diff, image saving, comments persistence, and linked file reading.
+- **Webview** (Browser) — Renders Preview (markdown-it + highlight.js + mermaid + KaTeX) and Rich Edit (Milkdown Crepe) modes. Handles themes, toolbar, TOC, search, comments UI, link preview, and selection detection.
+
+### Key Libraries
+
+- [markdown-it](https://github.com/markdown-it/markdown-it) — Markdown → HTML
+- [Milkdown](https://milkdown.dev/) — WYSIWYG editor (ProseMirror + remark)
+- [highlight.js](https://highlightjs.org/) — Syntax highlighting
+- [mermaid](https://mermaid.js.org/) — Diagram rendering
+- [KaTeX](https://katex.org/) — Math rendering
+- [diff](https://github.com/kpdecker/jsdiff) — Git diff computation
+- [Bun](https://bun.sh/) — Build tooling and package management
 
 ## License
 
