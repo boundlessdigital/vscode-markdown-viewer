@@ -1,6 +1,5 @@
 import type { EditorMode, EditorModeType } from "./types";
 import { PreviewMode } from "./modes/preview_mode";
-import { RichEditMode } from "./modes/rich_edit_mode";
 import { SourceEditMode } from "./modes/source_edit_mode";
 import { Toolbar, type SettingsState } from "./toolbar/toolbar";
 import { TableOfContents } from "./toc/toc";
@@ -13,7 +12,6 @@ import { Breadcrumbs } from "./reading/breadcrumbs";
 import { NavHistory } from "./reading/nav_history";
 import { Minimap } from "./reading/minimap";
 import { CollapsibleSections } from "./reading/collapsible";
-import { SplitView } from "./reading/split_view";
 import { AnnotationManager } from "./reading/annotations";
 import { BookmarkManager } from "./reading/bookmarks";
 import { NightShift } from "./reading/night_shift";
@@ -33,7 +31,7 @@ import "./styles/reading.css";
 
 const modes: Record<EditorModeType, EditorMode> = {
   preview: new PreviewMode(),
-  rich_edit: new RichEditMode(),
+  rich_edit: new PreviewMode(), // Rich edit removed, falls back to preview
   source_edit: new SourceEditMode(),
 };
 
@@ -53,7 +51,6 @@ let breadcrumbs: Breadcrumbs | null = null;
 let nav_history: NavHistory | null = null;
 let minimap: Minimap | null = null;
 let collapsible: CollapsibleSections | null = null;
-let split_view: SplitView | null = null;
 let annotation_manager: AnnotationManager | null = null;
 let bookmark_manager: BookmarkManager | null = null;
 let night_shift: NightShift | null = null;
@@ -156,13 +153,6 @@ function toggle_minimap() {
   }
 }
 
-function toggle_split() {
-  if (!split_view) {
-    split_view = new SplitView(editor_container);
-  }
-  split_view.toggle();
-}
-
 function toggle_bookmarks() {
   toolbar.toggle_bookmarks_dropdown(bookmark_manager!);
 }
@@ -246,7 +236,7 @@ function init() {
     on_toggle_toc: toggle_toc,
     on_toggle_diff: toggle_diff,
     on_toggle_minimap: toggle_minimap,
-    on_toggle_split: toggle_split,
+    on_toggle_split: () => {},
     on_toggle_bookmarks: toggle_bookmarks,
     on_nav_back: nav_back,
     on_nav_forward: nav_forward,
@@ -361,6 +351,8 @@ async function switch_mode(new_mode: EditorModeType) {
   after_render();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => init());
+} else {
   init();
-});
+}

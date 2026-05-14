@@ -29,18 +29,25 @@ const md = new MarkdownIt({
 let mermaid_id_counter = 0;
 
 function render_katex(html: string): string {
-  // Display math first ($$...$$)
-  html = html.replace(/\$\$([^$]+)\$\$/g, (_match, tex) => {
+  // Display math first ($$...$$) — must not span across HTML tags
+  html = html.replace(/\$\$([^$<>]+)\$\$/g, (_match, tex) => {
+    const trimmed = tex.trim();
+    if (!trimmed || /^\d/.test(trimmed)) return _match;
     try {
-      return katex.renderToString(tex, { displayMode: true, throwOnError: false });
+      return katex.renderToString(trimmed, { displayMode: true, throwOnError: false });
     } catch {
       return _match;
     }
   });
-  // Inline math ($...$)
-  html = html.replace(/\$([^$]+)\$/g, (_match, tex) => {
+  // Inline math ($...$) — exclude dollar amounts, HTML content, and multi-line spans
+  html = html.replace(/\$([^$<>\n]+)\$/g, (_match, tex) => {
+    const trimmed = tex.trim();
+    // Skip dollar amounts like $80.00, $1,500,000
+    if (!trimmed || /^\d/.test(trimmed)) return _match;
+    // Skip if it looks like a currency context (preceded by common currency patterns)
+    if (/^[\d,.]/.test(trimmed)) return _match;
     try {
-      return katex.renderToString(tex, { displayMode: false, throwOnError: false });
+      return katex.renderToString(trimmed, { displayMode: false, throwOnError: false });
     } catch {
       return _match;
     }
@@ -97,6 +104,8 @@ export class PreviewMode implements EditorMode {
     if (!this.container) return;
     const clean = strip_frontmatter(this.current_markdown);
     let html = md.render(clean);
+    html = html.replace(/<table>/g, '<div class="table-scroll"><table>')
+               .replace(/<\/table>/g, '</table></div>');
     html = render_katex(html);
     this.container.innerHTML = `<div class="markdown-body">${html}</div>`;
     await render_mermaid_diagrams(this.container);

@@ -40,19 +40,22 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       }
     );
 
-    // Auto-open .md files with our custom editor when they're opened in the default text editor
-    const auto_open = vscode.window.onDidChangeActiveTextEditor((editor) => {
+    // Auto-redirect .md files opened in the default text editor to our custom editor
+    const redirecting = new Set<string>();
+    const auto_open = vscode.window.onDidChangeActiveTextEditor(async (editor) => {
       if (!editor) return;
       const doc = editor.document;
+      const uri_str = doc.uri.toString();
+      if (redirecting.has(uri_str)) return;
       if (
         (doc.fileName.endsWith(".md") || doc.fileName.endsWith(".markdown")) &&
         doc.uri.scheme === "file"
       ) {
-        vscode.commands.executeCommand(
-          "vscode.openWith",
-          doc.uri,
-          MarkdownEditorProvider.VIEW_TYPE
-        );
+        redirecting.add(uri_str);
+        // Close the text editor tab first, then reopen with our custom editor
+        await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+        await vscode.commands.executeCommand("vscode.openWith", doc.uri, MarkdownEditorProvider.VIEW_TYPE);
+        redirecting.delete(uri_str);
       }
     });
 
@@ -105,7 +108,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
             webview.postMessage({
               type: "init",
               text: document.getText(),
-              mode: this.context.globalState.get<string>(STATE_KEY_MODE, "preview"),
+              mode: "preview",
               theme: this.context.globalState.get<string>(STATE_KEY_THEME, "light"),
               file_path: document.uri.fsPath,
               source_sync: this.context.globalState.get<boolean>(STATE_KEY_SOURCE_SYNC, false),

@@ -30,7 +30,7 @@ html, body {
 .markdown-body {
   color: var(--text, #374151);
   line-height: 1.72;
-  max-width: 720px;
+  max-width: min(1100px, calc(100vw - 64px));
   margin: 0 auto;
   font-size: var(--user-font-size, 15.5px);
   word-wrap: break-word;
@@ -189,10 +189,15 @@ html, body {
 }
 
 /* Tables */
+.markdown-body .table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  margin-bottom: 16px;
+}
+
 .markdown-body table {
   border-collapse: collapse;
   border-spacing: 0;
-  margin-bottom: 16px;
   width: auto;
   font-size: 14px;
 }

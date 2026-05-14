@@ -31,7 +31,6 @@ interface ToolbarConfig {
 
 const MODE_BUTTONS: { mode: EditorModeType; label: string }[] = [
   { mode: "preview", label: "Preview" },
-  { mode: "rich_edit", label: "Rich Edit" },
 ];
 
 export class Toolbar {
@@ -86,10 +85,6 @@ export class Toolbar {
     const minimap_btn = this.create_subtle_button("Map", "Toggle minimap");
     minimap_btn.addEventListener("click", config.on_toggle_minimap);
     reading_group.appendChild(minimap_btn);
-
-    const split_btn = this.create_subtle_button("Split", "Split view");
-    split_btn.addEventListener("click", config.on_toggle_split);
-    reading_group.appendChild(split_btn);
 
     this.container.appendChild(reading_group);
 
